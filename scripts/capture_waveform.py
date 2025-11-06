@@ -30,6 +30,19 @@ from amp_benchkit.tek import (  # noqa: E402
     scope_wait_single_complete,
 )
 
+ENV_DEFAULT_AMP = os.environ.get("AMP_VPP", "0.5")
+try:
+    DEFAULT_AMP_VPP = check_amp_vpp(float(ENV_DEFAULT_AMP), allow_zero=False)
+except (ValueError, FYError):
+    DEFAULT_AMP_VPP = min(0.5, FY_MAX_VPP)
+
+
+def _bounded_amp(text: str) -> float:
+    try:
+        return check_amp_vpp(float(text), allow_zero=False)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
 
 def capture_waveform(
     *,
@@ -166,15 +179,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-ENV_DEFAULT_AMP = os.environ.get("AMP_VPP", "0.5")
-try:
-    DEFAULT_AMP_VPP = check_amp_vpp(float(ENV_DEFAULT_AMP), allow_zero=False)
-except (ValueError, FYError):
-    DEFAULT_AMP_VPP = 0.5
-
-
-def _bounded_amp(text: str) -> float:
-    try:
-        return check_amp_vpp(float(text), allow_zero=False)
-    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
-        raise argparse.ArgumentTypeError(str(exc)) from exc

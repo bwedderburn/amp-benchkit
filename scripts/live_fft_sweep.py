@@ -182,6 +182,20 @@ def interpolate_amplitude(
     return nearest[1]
 
 
+def _amp_type(value: str) -> float:
+    try:
+        return check_amp_vpp(float(value), allow_zero=False)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _amp_type_allow_zero(value: str) -> float:
+    try:
+        return check_amp_vpp(float(value), allow_zero=True)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a live FFT sweep with timestamped capture.")
     parser.add_argument(
@@ -658,17 +672,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-
-def _amp_type(value: str) -> float:
-    try:
-        return check_amp_vpp(float(value), allow_zero=False)
-    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
-        raise argparse.ArgumentTypeError(str(exc)) from exc
-
-
-def _amp_type_allow_zero(value: str) -> float:
-    try:
-        return check_amp_vpp(float(value), allow_zero=True)
-    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
-        raise argparse.ArgumentTypeError(str(exc)) from exc
