@@ -10,7 +10,7 @@ replacements performed by the median filter.
 Example:
 
     python scripts/batch_thd_sweep.py \
-        --amplitudes 0.5,2,6,14,20 \
+        --amplitudes 0.2,0.5,0.9,1.2,1.35 \
         --dwell 0.5
 
 """
@@ -25,14 +25,22 @@ from collections.abc import Iterable
 from pathlib import Path
 from statistics import mean, median
 
+from amp_benchkit.fy import FY_MAX_VPP, FYError, check_amp_vpp
 from amp_benchkit.sweeps import format_thd_rows, thd_sweep
 
 
 def _parse_amplitudes(text: str) -> list[float]:
     try:
-        return [float(tok) for tok in text.split(",") if tok.strip()]
+        amps = [float(tok) for tok in text.split(",") if tok.strip()]
     except ValueError as exc:  # pragma: no cover - CLI parsing
         raise argparse.ArgumentTypeError(f"Invalid amplitude list: {text!r}") from exc
+    sanitized: list[float] = []
+    for amp in amps:
+        try:
+            sanitized.append(check_amp_vpp(amp, allow_zero=False))
+        except FYError as exc:  # pragma: no cover - CLI parsing
+            raise argparse.ArgumentTypeError(str(exc)) from exc
+    return sanitized
 
 
 def _summaries(
@@ -52,8 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--amplitudes",
         type=_parse_amplitudes,
-        default=_parse_amplitudes("0.5,2,6,14,20"),
-        help="Comma-separated list of Vpp levels (default: 0.5,2,6,14,20).",
+        default=_parse_amplitudes("0.2,0.5,0.9,1.2,1.35"),
+        help=(
+            "Comma-separated list of Vpp levels "
+            f"(default: 0.2,0.5,0.9,1.2,1.35; max {FY_MAX_VPP:.2f} Vpp)."
+        ),
     )
     p.add_argument(
         "--visa-resource",

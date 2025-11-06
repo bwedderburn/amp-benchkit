@@ -238,7 +238,7 @@ Automate the common “low/mid/high” check with the batch helper:
 
 ```bash
 python scripts/batch_thd_sweep.py \
-  --amplitudes 0.5,2,6,14,20 \
+  --amplitudes 0.2,0.5,0.9,1.2,1.35 \
   --dwell 0.5
 ```
 
@@ -317,8 +317,8 @@ from amp_benchkit.fy import fy_apply
 from amp_benchkit.tek import tek_capture_block, TEK_RSRC_DEFAULT
 from amp_benchkit.u3util import open_u3_safely
 
-# Apply a 1 kHz 2 Vpp sine on FY CH1 (auto port detection)
-fy_apply(freq_hz=1000, amp_vpp=2.0, wave="Sine", ch=1)
+# Apply a 1 kHz 1.0 Vpp sine on FY CH1 (auto port detection)
+fy_apply(freq_hz=1000, amp_vpp=1.0, wave="Sine", ch=1)
 
 # Capture a waveform from a Tek scope (returns t, volts, raw)
 t, v, raw = tek_capture_block(TEK_RSRC_DEFAULT, ch=1)
@@ -332,6 +332,8 @@ finally:
 	try: d.close()
 	except Exception: pass
 ```
+
+`fy_apply` clamps requests above `FY_MAX_VPP` (currently 1.35 Vpp) to protect downstream equipment; exceeding the limit raises `FYError`.
 
 If LabJack USB still not detected on Alpine (musl) add:
 ```bash

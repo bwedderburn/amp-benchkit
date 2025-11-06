@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from amp_benchkit.calibration import load_calibration_curve
-from amp_benchkit.fy import find_fy_port
+from amp_benchkit.fy import FY_MAX_VPP, FYError, check_amp_vpp, find_fy_port
 from amp_benchkit.sweeps import thd_sweep
 
 
@@ -143,7 +143,15 @@ def main() -> int:
             raise SystemExit("--amp-gain must be > 0")
         vrms_target = vrms_from_power(power_w, args.load_ohms)
         vpp_target = vpp_from_vrms(vrms_target)
-        gen_vpp = vpp_target / args.amp_gain
+        gen_vpp_raw = vpp_target / args.amp_gain
+        try:
+            gen_vpp = check_amp_vpp(gen_vpp_raw, allow_zero=False)
+        except FYError as exc:
+            raise SystemExit(
+                f"Required generator amplitude {gen_vpp_raw:.3f} Vpp exceeds "
+                f"the {FY_MAX_VPP:.2f} Vpp safety limit. Reduce target power or "
+                f"increase --amp-gain. ({exc})"
+            ) from exc
         print(
             f"\n=== THD sweep at {power_w:.4f} W -> {vrms_target:.4f} Vrms "
             f"(Vpp {vpp_target:.4f}, Vin {gen_vpp:.4f} Vpp) ==="

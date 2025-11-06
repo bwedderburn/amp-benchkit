@@ -1,17 +1,23 @@
 import math
 
 import numpy as np
+import pytest
 
 from amp_benchkit.dsp import find_knees, thd_fft
-from amp_benchkit.fy import build_fy_cmds
+from amp_benchkit.fy import FY_MAX_VPP, FYError, build_fy_cmds
 from unified_gui_layout import _decode_ieee_block
 
 
 def test_build_fy_cmds_basic():
-    cmds = build_fy_cmds(1000, 2.0, 0.0, "Sine", duty=12.3, ch=1)
+    cmds = build_fy_cmds(1000, 1.0, 0.0, "Sine", duty=12.3, ch=1)
     assert any(c.startswith("bw") for c in cmds)
     assert any(c.startswith("bd") and c.endswith("123") for c in cmds)
     assert cmds[1].endswith("000100000")  # 1000 Hz -> 100000 centi-Hz padded
+
+
+def test_build_fy_cmds_rejects_above_limit():
+    with pytest.raises(FYError):
+        build_fy_cmds(1000, FY_MAX_VPP + 0.1, 0.0, "Sine", duty=50.0, ch=1)
 
 
 def test_ieee_block_decode():

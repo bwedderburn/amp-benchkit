@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from amp_benchkit.fy import FY_PROTOCOLS  # central definition
+from amp_benchkit.fy import FY_MAX_VPP, FY_PROTOCOLS  # central definition
 
 from ._qt import require_qt  # headless-safe import helper
 
@@ -51,8 +51,10 @@ def build_generator_tab(gui: Any) -> object | None:
     c1.addWidget(QLabel("Frequency (Hz):"))
     c1.addWidget(gui.freq1)
     gui.amp1 = QLineEdit("0.25")
-    c1.addWidget(QLabel("Amplitude (Vpp):"))
+    c1.addWidget(QLabel(f"Amplitude (Vpp, ≤{FY_MAX_VPP:.2f}):"))
     c1.addWidget(gui.amp1)
+    gui.amp1.setPlaceholderText(f"≤ {FY_MAX_VPP:.2f}")
+    gui.amp1.setToolTip(f"FY output is limited to {FY_MAX_VPP:.2f} Vpp for safety.")
     gui.off1 = QLineEdit("0.0")
     c1.addWidget(QLabel("Offset (V):"))
     c1.addWidget(gui.off1)
@@ -91,6 +93,8 @@ def build_generator_tab(gui: Any) -> object | None:
     gui.sw_mode1.addItems(["Linear", "Log"])
     s1.addLayout(col("Mode", gui.sw_mode1))
     gui.sw_amp1 = QLineEdit("")
+    gui.sw_amp1.setPlaceholderText(f"≤ {FY_MAX_VPP:.2f}")
+    gui.sw_amp1.setToolTip(f"Override sweep amplitude (max {FY_MAX_VPP:.2f} Vpp).")
     s1.addLayout(col("Amp Vpp", gui.sw_amp1))
     gui.sw_dwell1 = QLineEdit("")
     s1.addLayout(col("Dwell ms", gui.sw_dwell1))
@@ -118,8 +122,10 @@ def build_generator_tab(gui: Any) -> object | None:
     c2.addWidget(QLabel("Frequency (Hz):"))
     c2.addWidget(gui.freq2)
     gui.amp2 = QLineEdit("0.25")
-    c2.addWidget(QLabel("Amplitude (Vpp):"))
+    c2.addWidget(QLabel(f"Amplitude (Vpp, ≤{FY_MAX_VPP:.2f}):"))
     c2.addWidget(gui.amp2)
+    gui.amp2.setPlaceholderText(f"≤ {FY_MAX_VPP:.2f}")
+    gui.amp2.setToolTip(f"FY output is limited to {FY_MAX_VPP:.2f} Vpp for safety.")
     gui.off2 = QLineEdit("0.0")
     c2.addWidget(QLabel("Offset (V):"))
     c2.addWidget(gui.off2)

@@ -35,7 +35,7 @@ if str(ROOT) not in sys.path:
 
 from amp_benchkit.automation import build_freq_points
 from amp_benchkit.deps import find_fy_port
-from amp_benchkit.fy import FYError, fy_apply
+from amp_benchkit.fy import FY_MAX_VPP, FYError, check_amp_vpp, fy_apply
 from amp_benchkit.tek import (
     TekError,
     scope_capture_fft_trace,
@@ -220,9 +220,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--amp-vpp",
-        type=float,
+        type=_amp_type,
         default=0.5,
-        help="Generator amplitude (Vpp) applied at each point.",
+        help=f"Generator amplitude (Vpp) applied at each point (max {FY_MAX_VPP:.2f}).",
     )
     parser.add_argument(
         "--dwell",
@@ -355,9 +355,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--restore-amp",
-        type=float,
+        type=_amp_type_allow_zero,
         default=None,
-        help="Generator amplitude (Vpp) to restore after sweep (defaults to sweep amplitude).",
+        help=(
+            "Generator amplitude (Vpp) to restore after sweep "
+            "(defaults to sweep amplitude, max "
+            f"{FY_MAX_VPP:.2f})."
+        ),
     )
     parser.add_argument(
         "--skip-restore",
@@ -654,3 +658,17 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _amp_type(value: str) -> float:
+    try:
+        return check_amp_vpp(float(value), allow_zero=False)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _amp_type_allow_zero(value: str) -> float:
+    try:
+        return check_amp_vpp(float(value), allow_zero=True)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc

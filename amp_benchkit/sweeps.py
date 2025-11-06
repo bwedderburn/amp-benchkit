@@ -14,7 +14,7 @@ from typing import Any
 from .automation import build_freq_points, sweep_audio_kpis
 from .calibration import CalibrationCurve
 from .dsp import find_knees, thd_fft, vpp, vrms
-from .fy import fy_apply
+from .fy import FYError, check_amp_vpp, fy_apply
 from .tek import (
     scope_arm_single,
     scope_capture_calibrated,
@@ -194,8 +194,10 @@ def thd_sweep(
     """
     if points < 2:
         raise ValueError("points must be >= 2")
-    if not math.isfinite(amp_vpp) or amp_vpp <= 0:
-        raise ValueError("amp_vpp must be > 0")
+    try:
+        amp_vpp = check_amp_vpp(float(amp_vpp), allow_zero=False)
+    except FYError as exc:
+        raise ValueError(str(exc)) from exc
     if not math.isfinite(dwell_s) or dwell_s < 0:
         raise ValueError("dwell_s must be >= 0")
 
@@ -211,19 +213,24 @@ def thd_sweep(
 
     amplitude_calibration = calibration_curve.apply if calibration_curve else None
 
+    target_amp: float | None = None
+    if calibrate_to_vpp is not None:
+        try:
+            target_amp = check_amp_vpp(float(calibrate_to_vpp), allow_zero=False)
+        except FYError as exc:
+            raise ValueError(str(exc)) from exc
+
     amp_vpp_strategy = None
-    if calibrate_to_vpp is not None and calibration_curve is not None:
-        target = float(calibrate_to_vpp)
+    if target_amp is not None and calibration_curve is not None:
 
         def _amp_strategy(freq: float) -> float:
             ratio = calibration_curve.ratio_at(freq)
-            if ratio <= 0:
-                return target
-            return target / ratio
+            candidate = target_amp if ratio <= 0 else target_amp / ratio
+            return check_amp_vpp(candidate, allow_zero=False)
 
         amp_vpp_strategy = _amp_strategy
 
-    sweep_amp = float(calibrate_to_vpp) if calibrate_to_vpp is not None else amp_vpp
+    sweep_amp = target_amp if target_amp is not None else amp_vpp
 
     def _fy_apply(**kw):
         return fy_apply(port=fy_port, proto=fy_proto, **kw)
@@ -392,8 +399,10 @@ def knee_sweep(
 
     if points < 2:
         raise ValueError("points must be >= 2")
-    if not math.isfinite(amp_vpp) or amp_vpp <= 0:
-        raise ValueError("amp_vpp must be > 0")
+    try:
+        amp_vpp = check_amp_vpp(float(amp_vpp), allow_zero=False)
+    except FYError as exc:
+        raise ValueError(str(exc)) from exc
     if not math.isfinite(dwell_s) or dwell_s < 0:
         raise ValueError("dwell_s must be >= 0")
     if not math.isfinite(knee_drop_db) or knee_drop_db <= 0:
@@ -411,19 +420,24 @@ def knee_sweep(
 
     amplitude_calibration = calibration_curve.apply if calibration_curve else None
 
+    target_amp: float | None = None
+    if calibrate_to_vpp is not None:
+        try:
+            target_amp = check_amp_vpp(float(calibrate_to_vpp), allow_zero=False)
+        except FYError as exc:
+            raise ValueError(str(exc)) from exc
+
     amp_vpp_strategy = None
-    if calibrate_to_vpp is not None and calibration_curve is not None:
-        target = float(calibrate_to_vpp)
+    if target_amp is not None and calibration_curve is not None:
 
         def _amp_strategy(freq: float) -> float:
             ratio = calibration_curve.ratio_at(freq)
-            if ratio <= 0:
-                return target
-            return target / ratio
+            candidate = target_amp if ratio <= 0 else target_amp / ratio
+            return check_amp_vpp(candidate, allow_zero=False)
 
         amp_vpp_strategy = _amp_strategy
 
-    sweep_amp = float(calibrate_to_vpp) if calibrate_to_vpp is not None else amp_vpp
+    sweep_amp = target_amp if target_amp is not None else amp_vpp
 
     def _fy_apply(**kw):
         return fy_apply(port=fy_port, proto=fy_proto, **kw)

@@ -12,6 +12,7 @@ from pathlib import Path
 
 from amp_benchkit.calibration import load_calibration_curve
 from amp_benchkit.deps import HAVE_PYVISA, _pyvisa, find_fy_port
+from amp_benchkit.fy import FY_MAX_VPP, FYError, check_amp_vpp
 from amp_benchkit.sweeps import thd_sweep
 
 TEK_VENDOR_IDS = {0x0699}  # Tektronix default USB vendor ID
@@ -61,6 +62,13 @@ def _parse_auto_scale(spec: str) -> dict[str, float]:
     return mapping
 
 
+def _bounded_amp(text: str) -> float:
+    try:
+        return check_amp_vpp(float(text), allow_zero=False)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run a THD sweep (Tek math channel).")
     p.add_argument(
@@ -69,7 +77,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Tektronix VISA resource string (auto if omitted).",
     )
     p.add_argument("--fy-port", default=None, help="FY3200S serial port (auto if omitted).")
-    p.add_argument("--amp-vpp", type=float, default=0.5, help="Generator amplitude (Vpp).")
+    p.add_argument(
+        "--amp-vpp",
+        type=_bounded_amp,
+        default=0.5,
+        help=f"Generator amplitude (Vpp, max {FY_MAX_VPP:.2f}).",
+    )
     p.add_argument("--start", type=float, default=20.0, help="Sweep start frequency (Hz).")
     p.add_argument("--stop", type=float, default=20000.0, help="Sweep stop frequency (Hz).")
     p.add_argument(
@@ -142,9 +155,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument(
         "--cal-target-vpp",
-        type=float,
+        type=_bounded_amp,
         default=None,
-        help="Target DUT amplitude when calibration is applied (adjust generator per frequency).",
+        help=(
+            "Target DUT amplitude when calibration is applied (adjust generator per frequency). "
+            f"Must be <= {FY_MAX_VPP:.2f} Vpp."
+        ),
     )
     return p.parse_args(argv)
 

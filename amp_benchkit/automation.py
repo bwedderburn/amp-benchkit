@@ -25,6 +25,7 @@ from collections.abc import Callable, Sequence
 from contextlib import suppress
 from typing import Any
 
+from amp_benchkit.fy import FYError, check_amp_vpp
 from amp_benchkit.tek import scope_configure_timebase, scope_read_timebase
 
 Number = float
@@ -126,6 +127,10 @@ def sweep_scope_fixed(
     """
     out: list[tuple[Number, float]] = []
     metric_key = "RMS" if metric.upper() == "RMS" else "PK2PK"
+    try:
+        base_amp = check_amp_vpp(float(amp_vpp), allow_zero=True)
+    except FYError as exc:
+        raise ValueError(str(exc)) from exc
     if u3_autoconfig:
         try:
             u3_autoconfig()
@@ -145,9 +150,12 @@ def sweep_scope_fixed(
             break
         settle_s = 0.0
         try:
-            amp_to_set = (
-                float(amp_vpp_strategy(f)) if amp_vpp_strategy is not None else float(amp_vpp)
-            )
+            amp_candidate = float(amp_vpp_strategy(f)) if amp_vpp_strategy is not None else base_amp
+            try:
+                amp_to_set = check_amp_vpp(amp_candidate, allow_zero=True)
+            except FYError as exc:
+                logger(f"FY amplitude error @ {f} Hz: {exc}")
+                continue
             try:
                 fy_apply(
                     freq_hz=f,
@@ -266,6 +274,10 @@ def sweep_audio_kpis(
             logger(f"U3 auto-config warn: {e}")
     n = len(freqs)
     rows = []
+    try:
+        base_amp = check_amp_vpp(float(amp_vpp), allow_zero=True)
+    except FYError as exc:
+        raise ValueError(str(exc)) from exc
     resource = scope_resource if scope_resource is not None else None
     original_scale = None
     if resource is not None:
@@ -284,9 +296,12 @@ def sweep_audio_kpis(
             break
         settle_s = 0.0
         try:
-            amp_to_set = (
-                float(amp_vpp_strategy(f)) if amp_vpp_strategy is not None else float(amp_vpp)
-            )
+            amp_candidate = float(amp_vpp_strategy(f)) if amp_vpp_strategy is not None else base_amp
+            try:
+                amp_to_set = check_amp_vpp(amp_candidate, allow_zero=True)
+            except FYError as exc:
+                logger(f"FY amplitude error @ {f} Hz: {exc}")
+                continue
             try:
                 fy_apply(
                     freq_hz=f,

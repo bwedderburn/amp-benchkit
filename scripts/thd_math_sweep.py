@@ -30,7 +30,21 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from amp_benchkit.fy import FY_MAX_VPP, FYError, check_amp_vpp  # noqa: E402
 from amp_benchkit.sweeps import format_thd_rows, thd_sweep  # noqa: E402
+
+ENV_DEFAULT_AMP = os.environ.get("AMP_VPP", "0.5")
+try:
+    DEFAULT_AMP_VPP = check_amp_vpp(float(ENV_DEFAULT_AMP), allow_zero=False)
+except (ValueError, FYError):
+    DEFAULT_AMP_VPP = min(0.5, FY_MAX_VPP)
+
+
+def _bounded_amp(text: str) -> float:
+    try:
+        return check_amp_vpp(float(text), allow_zero=False)
+    except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def main() -> int:
@@ -49,9 +63,9 @@ def main() -> int:
     )
     ap.add_argument(
         "--amp-vpp",
-        type=float,
-        default=float(os.environ.get("AMP_VPP", "0.5")),
-        help="Generator amplitude in Vpp.",
+        type=_bounded_amp,
+        default=DEFAULT_AMP_VPP,
+        help=f"Generator amplitude in Vpp (max {FY_MAX_VPP:.2f}).",
     )
     ap.add_argument(
         "--start-hz",
@@ -152,8 +166,6 @@ def main() -> int:
 
     if args.points < 2:
         raise ValueError("points must be >= 2")
-    if not math.isfinite(args.amp_vpp) or args.amp_vpp <= 0:
-        raise ValueError("amp_vpp must be > 0")
     if not math.isfinite(args.dwell) or args.dwell < 0:
         raise ValueError("dwell must be >= 0")
 

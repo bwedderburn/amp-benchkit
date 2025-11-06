@@ -7,6 +7,7 @@ and configuring sweeps. Hardware access requires pyserial.
 from __future__ import annotations
 
 import logging
+import math
 import time
 
 from .deps import (
@@ -20,6 +21,7 @@ FY_BAUD_EOLS = [(9600, "\n"), (115200, "\r\n")]
 FY_PROTOCOLS = ["FY ASCII 9600", "Auto (115200/CRLF→9600/LF)"]
 WAVE_CODE = {"Sine": "0", "Square": "1", "Pulse": "2", "Triangle": "3"}
 SWEEP_MODE = {"Linear": "0", "Log": "1"}
+FY_MAX_VPP = 1.35
 
 
 class FYError(Exception):
@@ -37,12 +39,29 @@ __all__ = [
     "FY_PROTOCOLS",
     "WAVE_CODE",
     "SWEEP_MODE",
+    "FY_MAX_VPP",
     "fy_apply",
     "fy_sweep",
     "build_fy_cmds",
+    "check_amp_vpp",
     "FYError",
     "FYTimeoutError",
 ]
+
+
+def check_amp_vpp(amp_vpp: float, *, allow_zero: bool = True) -> float:
+    """Ensure requested FY amplitude stays within safety limits."""
+
+    amp = float(amp_vpp)
+    if not math.isfinite(amp):
+        raise FYError("FY amplitude must be a finite number.")
+    if amp < 0:
+        raise FYError("FY amplitude must be >= 0 Vpp.")
+    if not allow_zero and amp <= 0:
+        raise FYError("FY amplitude must be > 0 Vpp.")
+    if amp > FY_MAX_VPP + 1e-9:
+        raise FYError(f"FY amplitude {amp:.3f} Vpp exceeds safety limit of {FY_MAX_VPP:.2f} Vpp.")
+    return amp
 
 
 def build_fy_cmds(freq_hz, amp_vpp, off_v, wave, duty=None, ch=1):
@@ -63,7 +82,8 @@ def build_fy_cmds(freq_hz, amp_vpp, off_v, wave, duty=None, ch=1):
     if duty is not None:
         dp = int(round(clamp(step(float(duty), 0.1), 0.0, 99.9) * 10))
         cmds.append(f"{pref}d{dp:03d}")
-    cmds.append(f"{pref}a{step(clamp(float(amp_vpp), 0.0, 99.99), 0.01):0.2f}")
+    target_amp = check_amp_vpp(float(amp_vpp))
+    cmds.append(f"{pref}a{step(clamp(target_amp, 0.0, FY_MAX_VPP), 0.01):0.2f}")
     for c in cmds:
         if len(c) + 1 > 15:
             raise ValueError("FY command too long: " + c)

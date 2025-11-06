@@ -58,7 +58,15 @@ from amp_benchkit.deps import (
 
 # Imported refactored helpers
 from amp_benchkit.diagnostics import collect_diagnostics
-from amp_benchkit.fy import FY_BAUD_EOLS, build_fy_cmds, fy_apply, fy_sweep
+from amp_benchkit.fy import (
+    FY_BAUD_EOLS,
+    FY_MAX_VPP,
+    FYError,
+    build_fy_cmds,
+    check_amp_vpp,
+    fy_apply,
+    fy_sweep,
+)
 from amp_benchkit.gui import build_generator_tab, build_scope_tab
 from amp_benchkit.logging import get_logger, setup_logging
 from amp_benchkit.sweeps import format_thd_rows, knee_sweep, thd_sweep
@@ -1790,6 +1798,30 @@ class UnifiedGUI(BaseGUI):
 
 
 def main():
+    def _cli_amp(value: str, *, allow_zero: bool) -> float:
+        try:
+            return check_amp_vpp(float(value), allow_zero=allow_zero)
+        except (ValueError, FYError) as exc:  # pragma: no cover - CLI parsing
+            raise argparse.ArgumentTypeError(str(exc)) from exc
+
+    def _cli_amp_gt_zero(value: str) -> float:
+        return _cli_amp(value, allow_zero=False)
+
+    def _cli_amp_allow_zero(value: str) -> float:
+        return _cli_amp(value, allow_zero=True)
+
+    def _env_amp_default(allow_zero: bool = False, fallback: float = 0.5) -> float:
+        raw = os.environ.get("AMP_VPP")
+        try:
+            candidate = float(raw) if raw is not None else fallback
+        except (TypeError, ValueError):
+            candidate = fallback
+        try:
+            return check_amp_vpp(candidate, allow_zero=allow_zero)
+        except FYError:
+            safe_fallback = min(fallback, FY_MAX_VPP)
+            return check_amp_vpp(safe_fallback, allow_zero=allow_zero)
+
     ap = argparse.ArgumentParser(description="Unified GUI (Lite+U3)")
     ap.add_argument("--gui", action="store_true", help="Launch Qt GUI")
     ap.add_argument("-v", "--verbose", action="store_true", help="Verbose logging (debug)")
@@ -1815,9 +1847,9 @@ def main():
     )
     sp_thd.add_argument(
         "--amp-vpp",
-        type=float,
-        default=float(os.environ.get("AMP_VPP", "0.5")),
-        help="Generator amplitude (Vpp).",
+        type=_cli_amp_gt_zero,
+        default=_env_amp_default(),
+        help=f"Generator amplitude (Vpp, max {FY_MAX_VPP:.2f}).",
     )
     sp_thd.add_argument(
         "--start",
@@ -1895,9 +1927,11 @@ def main():
     )
     sp_thd.add_argument(
         "--cal-target-vpp",
-        type=float,
+        type=_cli_amp_gt_zero,
         default=None,
-        help="Target DUT amplitude when calibration is applied.",
+        help=(
+            "Target DUT amplitude when calibration is applied. " f"Must be ≤ {FY_MAX_VPP:.2f} Vpp."
+        ),
     )
     sp_thd.add_argument(
         "--scope-auto-scale",
@@ -1946,9 +1980,9 @@ def main():
     )
     sp_knee.add_argument(
         "--amp-vpp",
-        type=float,
-        default=float(os.environ.get("AMP_VPP", "0.5")),
-        help="Generator amplitude (Vpp).",
+        type=_cli_amp_gt_zero,
+        default=_env_amp_default(),
+        help=f"Generator amplitude (Vpp, max {FY_MAX_VPP:.2f}).",
     )
     sp_knee.add_argument(
         "--start",
@@ -2003,9 +2037,11 @@ def main():
     )
     sp_knee.add_argument(
         "--cal-target-vpp",
-        type=float,
+        type=_cli_amp_gt_zero,
         default=None,
-        help="Target DUT amplitude when calibration is applied.",
+        help=(
+            "Target DUT amplitude when calibration is applied. " f"Must be ≤ {FY_MAX_VPP:.2f} Vpp."
+        ),
     )
     sp_knee.add_argument(
         "--knee-drop-db",
@@ -2118,9 +2154,11 @@ def main():
     )
     sp_fft.add_argument(
         "--fy-amp",
-        type=float,
+        type=_cli_amp_allow_zero,
         default=None,
-        help="If provided, set FY output amplitude (Vpp) before capture.",
+        help=(
+            "If provided, set FY output amplitude (Vpp) before capture " f"(max {FY_MAX_VPP:.2f})."
+        ),
     )
     sp_fft.add_argument(
         "--top",
@@ -2149,9 +2187,9 @@ def main():
     )
     sp_fft_sweep.add_argument(
         "--amp-vpp",
-        type=float,
-        default=float(os.environ.get("AMP_VPP", "0.5")),
-        help="Generator amplitude (Vpp).",
+        type=_cli_amp_gt_zero,
+        default=_env_amp_default(),
+        help=f"Generator amplitude (Vpp, max {FY_MAX_VPP:.2f}).",
     )
     sp_fft_sweep.add_argument(
         "--start",
@@ -2567,14 +2605,14 @@ def main():
 
             # Test2: command formatting
             for ch in (1, 2):
-                cmds = build_fy_cmds(1000, 2.0, 0.0, "Sine", duty=12.3, ch=ch)
+                cmds = build_fy_cmds(1000, 1.0, 0.0, "Sine", duty=12.3, ch=ch)
                 assert any(c.startswith(("bd", "dd")) for c in cmds)
                 assert cmds[-1].startswith(("ba", "da"))
                 assert all(len(c) + 1 <= 15 for c in cmds)
             print("Test2 OK: command formatting (duty 3-digit, amplitude last, length ≤15)")
 
             # Test3: centi-Hz scaling
-            assert build_fy_cmds(1000, 2.0, 0.0, "Sine", None, 1)[1].endswith(f"{1000 * 100:09d}")
+            assert build_fy_cmds(1000, 1.0, 0.0, "Sine", None, 1)[1].endswith(f"{1000 * 100:09d}")
             print("Test3 OK: centi-Hz scaling (1000 Hz → 100000)")
 
             # Test4: sweep start/end centi-Hz and 9-digit padding
@@ -2586,7 +2624,7 @@ def main():
             print("Test4 OK: sweep start/end centi-Hz and 9-digit padding")
 
             # Test5: duty 12.3% → d123
-            cmds = build_fy_cmds(1000, 2.0, 0.0, "Sine", duty=12.3, ch=1)
+            cmds = build_fy_cmds(1000, 1.0, 0.0, "Sine", duty=12.3, ch=1)
             duty_cmd = [c for c in cmds if c.startswith("bd")][0]
             assert duty_cmd.endswith("123")
             print("Test5 OK: duty 12.3% → d123")
@@ -2594,12 +2632,12 @@ def main():
             # Test6: clamp extremes
             cm = build_fy_cmds(1000, 120.0, 0.0, "Sine", duty=123.4, ch=1)
             assert any(x.endswith("999") for x in cm if x.startswith("bd"))
-            assert cm[-1].endswith("99.99")
+            assert cm[-1].endswith(f"{FY_MAX_VPP:0.2f}")
             cm2 = build_fy_cmds(1000, -5.0, 0.005, "Sine", duty=0.04, ch=2)
             assert cm2[-1].endswith("0.00")
             assert any(x.endswith("000") for x in cm2 if x.startswith("dd"))
             assert not any(x.endswith("0.01") for x in cm2 if x.startswith("do"))
-            print("Test6 OK: clamps for duty/amp/offset")
+            print(f"Test6 OK: clamps for duty/amp/offset (amp ≤ {FY_MAX_VPP:.2f} Vpp)")
 
             # Test7: IEEE block decode
             raw = b"#3100" + bytes(range(100)) + b"extra"
@@ -2615,7 +2653,7 @@ def main():
             print("Test8 OK: raw (non-#) IEEE block passthrough")
 
             # Test9: duty clamp at 0%
-            cm3 = build_fy_cmds(1000, 2.0, 0.0, "Sine", duty=-5.0, ch=1)
+            cm3 = build_fy_cmds(1000, 1.0, 0.0, "Sine", duty=-5.0, ch=1)
             assert any(x.endswith("000") for x in cm3 if x.startswith("bd"))
             print("Test9 OK: duty clamp at 0% → d000")
             # Test10: THD estimator sanity (sine + 10% 2nd harmonic)

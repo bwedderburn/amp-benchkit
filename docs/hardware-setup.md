@@ -9,7 +9,7 @@ This guide covers recommended wiring and configuration for each supported instru
 - Recommended default settings:
   - Waveform: sine
   - Channel: CH1
-  - Voltage: 2 Vpp (adjust per DUT)
+  - Voltage: ≤1.35 Vpp (hardware-enforced safety limit; adjust DUT gain instead)
 - The GUI exposes generator controls; CLI automation uses helper functions in `amp_benchkit.fy`.
 
 ## Tektronix TDS2024B Oscilloscope
