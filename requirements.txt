@@ -6,7 +6,7 @@ pyvisa==1.15.0
 pyserial==3.5
 LabJackPython==2.1.0
 # Either PySide6 or PyQt5 is acceptable; PySide6 preferred. Keep both pins for flexibility.
-PySide6==6.10.0
+PySide6==6.10.1
 PyQt5==5.15.11
 pip-tools>=7.3.0
 pip>=24.0

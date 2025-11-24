@@ -44,7 +44,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # Install with: pip install .[gui]
-gui = ["PySide6==6.10.0", "PyQt5==5.15.11"]
+gui = ["PySide6==6.10.1", "PyQt5==5.15.11"]
 dev = ["black", "ruff", "mypy", "pre-commit"]
 test = ["pytest", "pytest-cov"]
 publish = ["build", "twine", "wheel", "setuptools"]
