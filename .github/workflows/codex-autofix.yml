@@ -39,7 +39,7 @@ jobs:
 
       - name: Checkout the failing commit
         if: steps.trust.outputs.trusted == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
