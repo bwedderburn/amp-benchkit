@@ -38,7 +38,7 @@ jobs:
         run: pytest -q --cov=amp_benchkit --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage XML
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-${{ matrix.python-version }}
           path: coverage.xml
@@ -55,7 +55,7 @@ jobs:
           python -m build --sdist --wheel
 
       - name: Upload dists
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.python-version }}
           path: dist/*
